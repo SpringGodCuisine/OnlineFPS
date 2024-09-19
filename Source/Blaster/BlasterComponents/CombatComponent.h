@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Blaster/HUD/BlasterHUD.h"
 #include "CombatComponent.generated.h"
 
 #define TRACE_LENGTH 80000.f;
@@ -26,6 +27,9 @@ protected:
 	virtual void BeginPlay() override;
 	void SetAiming(bool bIsAiming);
 
+	// 声明一个服务器端的函数，用于处理射击逻辑
+	// Server：表明该函数将在服务器上执行
+	// Reliable：表示该函数调用是可靠的，确保一定会到达服务器
 	UFUNCTION(Server, Reliable)
 	void ServerSetAiming(bool bIsAiming);
 
@@ -34,9 +38,14 @@ protected:
 
 	void FireButtonPressed(bool bPressed);
 
+	// FVector_NetQuantize: 这是一个经过量化的 FVector 类型，表示用于网络传输的3D向量坐标。量化能减少数据的传输大小，提升网络效率，但可能会有一定的精度损失。
+	// 该函数是用于在服务器上处理射击逻辑的函数。客户端发出射击请求时，调用这个函数来告知服务器执行射击行为。
 	UFUNCTION(Server, Reliable)
 	void ServerFire(const FVector_NetQuantize& TraceHitTarget);
 
+	// 声明一个多播函数，用于通知所有客户端执行射击逻辑
+	// NetMulticast：表明该函数将在所有客户端和服务器上执行
+	// Reliable：表示该函数调用是可靠的，确保一定会到达所有客户端
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
 
@@ -70,6 +79,7 @@ private:
 	float CrosshairShootingFactor;
 
 	FVector HitTarget;
+	FHUDPackage HUDPackage;
 
 	//Aiming and FOV
 	//Field of view when not aiming; set to the camera's base FOV in BeginPlay

@@ -17,33 +17,46 @@
 ABlasterCharacter::ABlasterCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
+	// 创建并设置摄像机臂（SpringArm），将其附加到角色的网格组件
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetMesh());
 	CameraBoom->TargetArmLength = 600;
 	CameraBoom->bUsePawnControlRotation = true;
 
+	// 创建并设置跟随摄像机，将其附加到摄像机臂的插槽上
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
+	// 禁用角色的Yaw方向上的控制旋转
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 
+	// 创建并设置头顶UI组件，附加到角色的根组件
 	OverheadWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
 	OverheadWidget->SetupAttachment(RootComponent);
 
+	// 创建并设置战斗组件，并使其可进行网络同步
 	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	Combat->SetIsReplicated(true);
 
+	// 允许角色蹲伏
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 
+	// 设置胶囊体组件对摄像机通道的碰撞响应为忽略
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
-	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
 
+	// 设置角色网格组件对摄像机通道和可见性通道的碰撞响应为忽略
+	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
+	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Ignore);
+
+	// 设置角色的旋转速率
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 0.f, 850.f);
 
+	// 初始化角色的转身状态为不转身
 	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+
+	// 设置网络更新频率
 	NetUpdateFrequency = 66.f;
 	MinNetUpdateFrequency = 33.f;
 }
@@ -251,42 +264,64 @@ void ABlasterCharacter::AimButtonReleased()
 
 void ABlasterCharacter::AimOffset(float DeltaTime)
 {
+	// 获取角色的速度向量，并将 Z 轴速度置为 0，以忽略垂直方向上的速度
 	FVector Velocity = GetVelocity();
 	Velocity.Z = 0.f;
+
+	// 计算角色的水平速度大小
 	float Speed = Velocity.Size();
+
+	// 判断角色是否处于空中状态
 	bool bIsInAir = GetCharacterMovement()->IsFalling();
 
+	// 当角色在移动或处于空中时，更新起始的瞄准方向
 	if (Speed > 0.f || bIsInAir)
 	{
 		StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
 	}
 
+	// 检查角色的 Combat 组件及其装备武器是否为空，如果为空则直接返回
 	if (Combat && Combat->EquippedWeapon == nullptr)return;
-
-
+	
+	// 如果角色处于静止状态且不在空中（站立，不跳跃）
 	if (Speed == 0.f && !bIsInAir) // Standing still, not jumping
 	{
+		// 获取当前的瞄准方向，并计算与起始瞄准方向的差值
 		FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
 		FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StartingAimRotation);
+		// 将 Yaw 轴上的旋转差值赋值给 AO_Yaw
 		AO_Yaw = DeltaAimRotation.Yaw;
+		// 如果没有转身（未处于转身状态）
 		if (TurningInPlace == ETurningInPlace::ETIP_NotTurning)
 		{
+			// 插值更新瞄准的 Yaw 值
 			InterpAO_Yaw = AO_Yaw;
 		}
+
+		// 允许控制器控制 Yaw 旋转
 		bUseControllerRotationYaw = true;
+
+		// 处理转身逻辑
 		TurnInPlace(DeltaTime);
 	}
 	if (Speed > 0.f || bIsInAir) // running or jumping
 	{
+		// 更新起始的瞄准方向
 		StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
+		// 将 AO_Yaw 重置为 0，因为在奔跑或跳跃中无需考虑 Yaw 偏移
 		AO_Yaw = 0.f;
+		// 允许控制器控制 Yaw 旋转
 		bUseControllerRotationYaw = true;
+		// 设置为未处于转身状态
 		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 	}
 	
+	// 更新 Pitch 轴上的瞄准角度（抬头或低头）
 	AO_Pitch = GetBaseAimRotation().Pitch;
+	// 如果 Pitch 角度超过 90 并且角色不是本地控制的（远程角色），映射其 Pitch 范围
 	if (AO_Pitch > 90.f && !IsLocallyControlled())
 	{
+		// 将 [270, 360] 范围的 Pitch 映射到 [-90, 0]，以确保角度正确
 		// map pitch from [270, 360] to [-90, 0)
 		FVector2D InRange(270.f, 360.f);
 		FVector2D OutRange(-90.f, 0.f);
@@ -325,21 +360,29 @@ void ABlasterCharacter::FireButtonReleased()
 
 void ABlasterCharacter::TurnInPlace(float DeltaTime)
 {
+	// 如果角色的 Yaw 偏移量大于 90 度，设置为向右转身
 	if (AO_Yaw > 90.f)
 	{
 		TurningInPlace = ETurningInPlace::ETIP_Right;
 	}
+	// 如果角色的 Yaw 偏移量小于 -90 度，设置为向左转身
 	else if (AO_Yaw < -90.f)
 	{
 		TurningInPlace = ETurningInPlace::ETIP_Left;
 	}
+	// 如果角色当前正在转身（不处于未转身状态）
 	if (TurningInPlace != ETurningInPlace::ETIP_NotTurning)
 	{
+		// 使用插值函数逐渐将 InterpAO_Yaw 值平滑过渡到 0，确保转身动作流畅
 		InterpAO_Yaw = FMath::FInterpTo(InterpAO_Yaw, 0.f, DeltaTime, 4.0f);
+		// 将平滑后的 InterpAO_Yaw 值赋值给 AO_Yaw
 		AO_Yaw = InterpAO_Yaw;
+		// 如果 AO_Yaw 的绝对值小于 15 度，说明转身接近完成
 		if (FMath::Abs(AO_Yaw) < 15.f)
 		{
+			// 设置角色的转身状态为不再转身
 			TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+			// 更新起始瞄准方向为当前的 Yaw 方向，确保接下来的瞄准操作基于新的方向
 			StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
 		}
 	}
