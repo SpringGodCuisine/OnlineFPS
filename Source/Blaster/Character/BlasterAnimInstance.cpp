@@ -93,7 +93,8 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 			// 获取武器的 "Hand_R" 插槽的世界变换
 			FTransform RightHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("Hand_R"), ERelativeTransformSpace::RTS_World);
 			// 计算右手的旋转，瞄准角色的击中目标
-			RightHandRotation = UKismetMathLibrary::FindLookAtRotation(RightHandTransform.GetLocation(), RightHandTransform.GetLocation() + (RightHandTransform.GetLocation() - BlasterCharacter->GetHitTarget()));
+			FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(RightHandTransform.GetLocation(), RightHandTransform.GetLocation() + (RightHandTransform.GetLocation() - BlasterCharacter->GetHitTarget()));
+			RightHandRotation = FMath::RInterpTo(RightHandRotation, LookAtRotation, DeltaTime, 30.f);
 		}
 
 		UE_LOG(LogTemp, Warning, TEXT("HitTarget::%s"), *BlasterCharacter->GetHitTarget().ToString());

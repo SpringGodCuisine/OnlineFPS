@@ -233,6 +233,15 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		// 线性追踪的起始位置（十字准星在世界中的位置）
 		FVector Start = CrosshairWorldPosition;
 		// 线性追踪的终点位置（起点加上方向向量乘以追踪长度）
+
+		//前推一点，避免射线与角色碰撞
+		if (Character)
+		{
+			float DistanceToCharacter = (Character->GetActorLocation() - Start).Size();
+			Start += CrosshairWorldDirection * (DistanceToCharacter + 100.f);
+			//DrawDebugSphere(GetWorld(), Start, 16.f, 12, FColor::Red, false);
+		}
+
 		FVector End = Start + CrosshairWorldDirection * TRACE_LENGTH;
 		// 使用可见性通道进行线性追踪（从起点到终点）
 		GetWorld()->LineTraceSingleByChannel(
