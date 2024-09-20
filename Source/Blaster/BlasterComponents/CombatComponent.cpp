@@ -11,8 +11,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
 #include "Blaster/PlayerController/BlasterPlayerController.h"
-#include "Blaster/HUD/BlasterHUD.h"
 #include "Camera/CameraComponent.h"
+#include "TimerManager.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -56,6 +56,144 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 		HitTarget = HitResult.ImpactPoint;
 		SetHUDCrosshairs(DeltaTime);
 		InterpFOV(DeltaTime);
+	}
+}
+
+void UCombatComponent::FireButtonPressed(bool bPressed)
+{
+	bFireButtonPressed = bPressed;
+
+	if (bFireButtonPressed == true)
+	{
+		Fire();
+	}
+}
+
+void UCombatComponent::Fire()
+{
+	if (bCanFire && EquippedWeapon)
+	{
+		bCanFire = false;
+		ServerFire(HitTarget);
+		CrosshairShootingFactor = 0.75f;
+		StartFireTimer();
+	}
+}
+
+void UCombatComponent::StartFireTimer()
+{
+	if (EquippedWeapon == nullptr || Character == nullptr)return;
+	Character->GetWorldTimerManager().SetTimer(
+		FireTimer,
+		this,
+		&UCombatComponent::FireTimerFinished,
+		EquippedWeapon->FireDelay
+	);
+}
+
+void UCombatComponent::FireTimerFinished()
+{
+	if (EquippedWeapon == nullptr || Character == nullptr)return;
+	bCanFire = true;
+	if (bFireButtonPressed && EquippedWeapon->bAutomatic)
+	{
+		Fire();
+	}
+}
+
+void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
+{
+	MulticastFire(TraceHitTarget);
+}
+
+void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
+{
+	if (EquippedWeapon == nullptr)return;
+	if (Character)
+	{
+		Character->PlayFireMontage(bAiming);
+		EquippedWeapon->Fire(TraceHitTarget);
+	}
+}
+ 
+void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
+{
+	if (Character == nullptr || WeaponToEquip == nullptr)return;
+
+	EquippedWeapon = WeaponToEquip;
+	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+
+	const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
+	if (HandSocket)
+	{ 
+		HandSocket->AttachActor(WeaponToEquip, Character->GetMesh());
+	}
+	EquippedWeapon->SetOwner(Character);
+	Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+	Character->bUseControllerRotationYaw = true;
+}
+
+void UCombatComponent::OnRep_EquippedWeapon()
+{
+	if (EquippedWeapon && Character)
+	{
+		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+		Character->bUseControllerRotationYaw = true;
+	}
+}
+
+void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
+{
+	// 定义屏幕的尺寸
+	FVector2D ViewportSize;
+	// 检查引擎和游戏视口是否有效，然后获取视口尺寸
+	if (GEngine && GEngine->GameViewport)
+	{
+		GEngine->GameViewport->GetViewportSize(ViewportSize);
+	}
+	// 计算十字准星的位置（屏幕中心点）
+	FVector2D CrosshairLocation(ViewportSize.X / 2.f, ViewportSize.Y / 2);
+	// 定义世界坐标中的位置和方向向量
+	FVector CrosshairWorldPosition;
+	FVector CrosshairWorldDirection;
+	// 将屏幕位置（十字准星位置）转换为世界位置和方向
+	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
+		UGameplayStatics::GetPlayerController(this, 0),
+		CrosshairLocation,
+		CrosshairWorldPosition,
+		CrosshairWorldDirection
+	);
+	// 如果屏幕坐标成功转换为世界坐标
+	if (bScreenToWorld)
+	{
+		// 线性追踪的起始位置（十字准星在世界中的位置）
+		FVector Start = CrosshairWorldPosition;
+		// 线性追踪的终点位置（起点加上方向向量乘以追踪长度）
+
+		//前推一点，避免射线与角色碰撞
+		if (Character)
+		{
+			float DistanceToCharacter = (Character->GetActorLocation() - Start).Size();
+			Start += CrosshairWorldDirection * (DistanceToCharacter + 100.f);
+			//DrawDebugSphere(GetWorld(), Start, 16.f, 12, FColor::Red, false);
+		}
+
+		FVector End = Start + CrosshairWorldDirection * TRACE_LENGTH;
+		// 使用可见性通道进行线性追踪（从起点到终点）
+		GetWorld()->LineTraceSingleByChannel(
+			TraceHitResult,		// 输出：命中的结果
+			Start,				// 线性追踪的起点
+			End,				// 线性追踪的终点
+			ECollisionChannel::ECC_Visibility	// 可见性通道
+		);
+		if (TraceHitResult.GetActor() && TraceHitResult.GetActor()->Implements<UInteractWithCrosshairsInterface>())
+		{
+			HUDPackage.CrosshairColor = FLinearColor::Red;
+		}
+		else
+		{
+			HUDPackage.CrosshairColor = FLinearColor::White;
+		}
 	}
 }
 
@@ -127,7 +265,7 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 			CrosshairShootingFactor = FMath::FInterpTo(CrosshairShootingFactor, 0.f, DeltaTime, 40.f);
 
 			// 计算最终的准星扩散值：基础值 + 各个扩散因子
-			HUDPackage.CrosshairSpread = 
+			HUDPackage.CrosshairSpread =
 				0.5f +					// 基础值
 				CrosshairVelocityFactor +  // 速度扩散因子
 				CrosshairInAirFactor -	 // 空中扩散因子	
@@ -136,7 +274,7 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 
 			// 将计算好的 HUDPackage 发送给 HUD 进行更新
 			HUD->SetHUDPackage(HUDPackage);
-		}   
+		}
 	}
 }
 
@@ -157,7 +295,6 @@ void UCombatComponent::InterpFOV(float DeltaTime)
 	}
 }
 
-
 void UCombatComponent::SetAiming(bool bIsAiming)
 {
 	bAiming = bIsAiming;
@@ -176,120 +313,3 @@ void UCombatComponent::ServerSetAiming_Implementation(bool bIsAiming)
 		Character->GetCharacterMovement()->MaxWalkSpeed = bIsAiming ? AimWalkSpeed : BaseWalkSpeed;
 	}
 }
-
-// 当武器改变时调用
-void UCombatComponent::OnRep_EquippedWeapon()
-{
-	if (EquippedWeapon && Character)
-	{
-		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
-		Character->bUseControllerRotationYaw = true;
-	}
-}
-
-// 开火
-void UCombatComponent::FireButtonPressed(bool bPressed)
-{
-	bFireButtonPressed = bPressed;
-
-	if (bFireButtonPressed == true)
-	{
-		FHitResult HitResult;
-		TraceUnderCrosshairs(HitResult);
-		ServerFire(HitResult.ImpactPoint);
-
-		if (EquippedWeapon)
-		{
-			CrosshairShootingFactor = 0.75f;
-		}
-	}
-}
-
-// 瞄准十字准星
-void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
-{
-	// 定义屏幕的尺寸
-	FVector2D ViewportSize;
-	// 检查引擎和游戏视口是否有效，然后获取视口尺寸
-	if (GEngine && GEngine->GameViewport)
-	{
-		GEngine->GameViewport->GetViewportSize(ViewportSize);
-	}
-	// 计算十字准星的位置（屏幕中心点）
-	FVector2D CrosshairLocation(ViewportSize.X / 2.f, ViewportSize.Y / 2);
-	// 定义世界坐标中的位置和方向向量
-	FVector CrosshairWorldPosition;
-	FVector CrosshairWorldDirection;
-	// 将屏幕位置（十字准星位置）转换为世界位置和方向
-	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
-		UGameplayStatics::GetPlayerController(this, 0),
-		CrosshairLocation,
-		CrosshairWorldPosition,
-		CrosshairWorldDirection
-	);
-	// 如果屏幕坐标成功转换为世界坐标
-	if (bScreenToWorld)
-	{
-		// 线性追踪的起始位置（十字准星在世界中的位置）
-		FVector Start = CrosshairWorldPosition;
-		// 线性追踪的终点位置（起点加上方向向量乘以追踪长度）
-
-		//前推一点，避免射线与角色碰撞
-		if (Character)
-		{
-			float DistanceToCharacter = (Character->GetActorLocation() - Start).Size();
-			Start += CrosshairWorldDirection * (DistanceToCharacter + 100.f);
-			//DrawDebugSphere(GetWorld(), Start, 16.f, 12, FColor::Red, false);
-		}
-
-		FVector End = Start + CrosshairWorldDirection * TRACE_LENGTH;
-		// 使用可见性通道进行线性追踪（从起点到终点）
-		GetWorld()->LineTraceSingleByChannel(
-			TraceHitResult,		// 输出：命中的结果
-			Start,				// 线性追踪的起点
-			End,				// 线性追踪的终点
-			ECollisionChannel::ECC_Visibility	// 可见性通道
-		);
-		if (TraceHitResult.GetActor() && TraceHitResult.GetActor()->Implements<UInteractWithCrosshairsInterface>())
-		{
-			HUDPackage.CrosshairColor = FLinearColor::Red;
-		}
-		else
-		{
-			HUDPackage.CrosshairColor = FLinearColor::White;
-		}
-	}
-}
-
-void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
-{
-	if (EquippedWeapon == nullptr)return;
-	if (Character)
-	{
-		Character->PlayFireMontage(bAiming);
-		EquippedWeapon->Fire(TraceHitTarget);
-	}
-}
-
-void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
-{
-	MulticastFire(TraceHitTarget);
-}
- 
-void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
-{
-	if (Character == nullptr || WeaponToEquip == nullptr)return;
-
-	EquippedWeapon = WeaponToEquip;
-	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
-
-	const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
-	if (HandSocket)
-	{ 
-		HandSocket->AttachActor(WeaponToEquip, Character->GetMesh());
-	}
-	EquippedWeapon->SetOwner(Character);
-	Character->GetCharacterMovement()->bOrientRotationToMovement = false;
-	Character->bUseControllerRotationYaw = true;
-}
-

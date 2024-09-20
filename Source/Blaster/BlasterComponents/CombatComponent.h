@@ -38,6 +38,8 @@ protected:
 
 	void FireButtonPressed(bool bPressed);
 
+	void Fire();
+
 	// FVector_NetQuantize: 这是一个经过量化的 FVector 类型，表示用于网络传输的3D向量坐标。量化能减少数据的传输大小，提升网络效率，但可能会有一定的精度损失。
 	// 该函数是用于在服务器上处理射击逻辑的函数。客户端发出射击请求时，调用这个函数来告知服务器执行射击行为。
 	UFUNCTION(Server, Reliable)
@@ -94,4 +96,14 @@ private:
 	float ZoomInterpSpeed = 20.f;
 
 	void InterpFOV(float DeltaTime);
+
+	/**
+	* Automatic fire
+	*/
+	FTimerHandle FireTimer;
+
+	bool bCanFire = true;
+
+	void StartFireTimer();
+	void FireTimerFinished();
 };
