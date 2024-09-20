@@ -75,7 +75,24 @@ void ABlasterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	AimOffset(DeltaTime);
+	if (GetLocalRole() > ENetRole::ROLE_SimulatedProxy && IsLocallyControlled())
+	{
+		AimOffset(DeltaTime);
+	}
+	else
+	{
+		TimeSinceLastMovementReplication += DeltaTime;
+		if (TimeSinceLastMovementReplication > 0.25f)
+		{
+			//OnRep_ReplicatedMovement();
+
+			SimProxiesTurn();
+			TimeSinceLastMovementReplication = 0.f;
+
+		}
+		CalculateAO_Pitch();
+	}
+
 	HideCameraIfCharacterClose();
 }
 
@@ -184,6 +201,13 @@ FVector ABlasterCharacter::GetHitTarget() const
 {
 	if (Combat == nullptr)return FVector();
 	return Combat->HitTarget;
+}
+
+void ABlasterCharacter::OnRep_ReplicatedMovement()
+{
+	Super::OnRep_ReplicatedMovement();
+	SimProxiesTurn();
+	TimeSinceLastMovementReplication = 0.f;
 }
 
 void ABlasterCharacter::BeginPlay()
@@ -305,14 +329,19 @@ void ABlasterCharacter::AimButtonReleased()
 	}
 }
 
-void ABlasterCharacter::AimOffset(float DeltaTime)
+float ABlasterCharacter::CalculateSpeed()
 {
 	// 获取角色的速度向量，并将 Z 轴速度置为 0，以忽略垂直方向上的速度
 	FVector Velocity = GetVelocity();
 	Velocity.Z = 0.f;
-
 	// 计算角色的水平速度大小
 	float Speed = Velocity.Size();
+	return Speed;
+}
+
+void ABlasterCharacter::AimOffset(float DeltaTime)
+{
+	float Speed = CalculateSpeed();
 
 	// 判断角色是否处于空中状态
 	bool bIsInAir = GetCharacterMovement()->IsFalling();
@@ -329,6 +358,8 @@ void ABlasterCharacter::AimOffset(float DeltaTime)
 	// 如果角色处于静止状态且不在空中（站立，不跳跃）
 	if (Speed == 0.f && !bIsInAir) // Standing still, not jumping
 	{
+		bRotateRootBone = true;
+
 		// 获取当前的瞄准方向，并计算与起始瞄准方向的差值
 		FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
 		FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StartingAimRotation);
@@ -349,6 +380,7 @@ void ABlasterCharacter::AimOffset(float DeltaTime)
 	}
 	if (Speed > 0.f || bIsInAir) // running or jumping
 	{
+		bRotateRootBone = false;
 		// 更新起始的瞄准方向
 		StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
 		// 将 AO_Yaw 重置为 0，因为在奔跑或跳跃中无需考虑 Yaw 偏移
@@ -359,6 +391,11 @@ void ABlasterCharacter::AimOffset(float DeltaTime)
 		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 	}
 	
+	CalculateAO_Pitch();
+}
+
+void ABlasterCharacter::CalculateAO_Pitch()
+{
 	// 更新 Pitch 轴上的瞄准角度（抬头或低头）
 	AO_Pitch = GetBaseAimRotation().Pitch;
 	// 如果 Pitch 角度超过 90 并且角色不是本地控制的（远程角色），映射其 Pitch 范围
@@ -371,6 +408,44 @@ void ABlasterCharacter::AimOffset(float DeltaTime)
 
 		AO_Pitch = FMath::GetMappedRangeValueClamped(InRange, OutRange, AO_Pitch);
 	}
+}
+
+void ABlasterCharacter::SimProxiesTurn()
+{
+	if (Combat == nullptr || Combat->EquippedWeapon == nullptr)return;
+
+	bRotateRootBone = false;
+
+	float Speed = CalculateSpeed();
+	if (Speed > 0.f)
+	{
+		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+		return;
+	}
+
+	ProxyRotationLastFrame = ProxyRotation;
+	ProxyRotation = GetActorRotation();
+	ProxyYaw = UKismetMathLibrary::NormalizedDeltaRotator(ProxyRotation, ProxyRotationLastFrame).Yaw;
+
+	UE_LOG(LogTemp, Warning, TEXT("ProxyYaw:: %f"), ProxyYaw);
+
+	if (FMath::Abs(ProxyYaw) > TurnThreshold)
+	{
+		if (ProxyYaw > TurnThreshold)
+		{
+			TurningInPlace = ETurningInPlace::ETIP_Right;
+		}
+		else if (ProxyYaw < -TurnThreshold)
+		{
+			TurningInPlace = ETurningInPlace::ETIP_Left;
+		}
+		else
+		{
+			TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+		}
+		return;
+	}
+	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 }
 
 void ABlasterCharacter::Jump()
