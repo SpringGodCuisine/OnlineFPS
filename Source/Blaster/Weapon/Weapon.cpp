@@ -90,12 +90,6 @@ void AWeapon::OnRep_WeaponState()
 	{
 		case EWeaponState::EWS_Equipped:
 		{
-			GEngine->AddOnScreenDebugMessage(
-				-1,
-				15.f,
-				FColor::Green,
-				FString(TEXT("EWS_Equipped"))
-			);
 			ShowPickupWidget(false);
 			break;
 		}

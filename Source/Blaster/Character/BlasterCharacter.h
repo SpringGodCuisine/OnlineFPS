@@ -22,6 +22,7 @@ public:
 	void PlayFireMontage(bool bAiming);
 
 	virtual void OnRep_ReplicatedMovement()override;
+	void Elim();
 
 protected:
 	virtual void BeginPlay() override;
@@ -40,7 +41,7 @@ protected:
 	virtual void Jump() override;
 	void FireButtonPressed();
 	void FireButtonReleased();
-	void PlayHitReactMontage();
+	void PlayHitReactMontage(); 
 
 	UFUNCTION()
 	void ReceiveDamage(AActor* DamageActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCauser);
@@ -65,6 +66,8 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	class UCombatComponent* Combat;
 
+	// 该函数的逻辑只会在服务器上执行。客户端调用该函数时，客户端不会直接执行函数体，而是向服务器发送一个网络请求，请求服务器执行该函数的逻辑。
+	// Reliable 表示这个函数的调用是可靠的，即确保服务器一定会接收到该请求并执行。如果网络状况不好，Unreal Engine 会重试直到成功发送。
 	UFUNCTION(Server, Reliable)
 	void ServerEuqipButtonPressed();
 

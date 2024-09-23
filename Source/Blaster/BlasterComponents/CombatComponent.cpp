@@ -120,16 +120,23 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 {
 	if (Character == nullptr || WeaponToEquip == nullptr)return;
 
+	// 将当前要装备的武器设置为 EquippedWeapon
 	EquippedWeapon = WeaponToEquip;
+	// 设置武器的状态为 "已装备"（EWS_Equipped）
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
 
+	// 获取角色右手的骨骼插槽 "RightHandSocket"
 	const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
 	if (HandSocket)
 	{ 
+		// 将武器附加到角色的右手插槽
 		HandSocket->AttachActor(WeaponToEquip, Character->GetMesh());
 	}
+	// 将武器的拥有者设置为当前角色
 	EquippedWeapon->SetOwner(Character);
+	// 禁用角色根据移动方向自动旋转
 	Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+	// 启用角色根据控制器的 Yaw 旋转
 	Character->bUseControllerRotationYaw = true;
 }
 
