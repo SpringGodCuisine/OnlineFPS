@@ -47,6 +47,8 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	TurningInPlace = BlasterCharacter->GetTurningInPlace();
 	// 获取根骨骼旋转
 	bRotateRootBone = BlasterCharacter->ShouldRotateRootBone();
+	// 是否淘汰
+	bElimmed = BlasterCharacter->IsElimmed();
 
 	// Offset Yaw for Strafing
 	// 计算角色的偏航角度偏移，用于 Strafing 动作（侧移）
