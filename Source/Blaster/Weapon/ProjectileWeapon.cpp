@@ -31,6 +31,7 @@ void AProjectileWeapon::Fire(const FVector& HitTarget)
 		{
 			// 设置投射物的生成参数，设置所有者和发起者
 			FActorSpawnParameters SpawnParams;
+			// Set Owner From EquipWeapon
 			SpawnParams.Owner = GetOwner();		// 投射物的所有者
 			SpawnParams.Instigator = InstigatorPawn;	// 发起者（Instigator）
 			UWorld* World = GetWorld();
