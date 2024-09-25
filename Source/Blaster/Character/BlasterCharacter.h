@@ -30,7 +30,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-	virtual void Destroyed() override;
+	virtual void Destroyed() override; 
 
 	void MoveForward(float Value);
 	void MoveRight(float Value);
@@ -175,4 +175,6 @@ public:
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 	FORCEINLINE bool ShouldRotateRootBone() const { return bRotateRootBone; }
 	FORCEINLINE bool IsElimmed() const { return bElimmed; }
+	FORCEINLINE float GetHealth() const { return Health; }
+	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
 };
