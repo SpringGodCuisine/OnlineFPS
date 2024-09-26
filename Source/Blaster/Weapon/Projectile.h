@@ -40,6 +40,7 @@ private:
 	UPROPERTY(EditAnyWhere)
 	class UParticleSystem* Tracer;
 	//是一个组件，用于将粒子系统实例化并显示在场景中，控制粒子系统的播放与停止。
+	UPROPERTY()
 	class UParticleSystemComponent* TracerComponent;
 
 	UPROPERTY(EditAnyWhere)
