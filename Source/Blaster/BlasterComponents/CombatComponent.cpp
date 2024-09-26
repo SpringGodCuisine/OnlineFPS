@@ -120,6 +120,11 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 {
 	if (Character == nullptr || WeaponToEquip == nullptr)return;
 
+	if (EquippedWeapon)
+	{
+		EquippedWeapon->Dropped();
+	}
+
 	// 将当前要装备的武器设置为 EquippedWeapon
 	EquippedWeapon = WeaponToEquip;
 	// 设置武器的状态为 "已装备"（EWS_Equipped）
@@ -133,6 +138,7 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	}
 	// 将武器的拥有者设置为当前角色
 	EquippedWeapon->SetOwner(Character);
+	EquippedWeapon->SetHUDAmmo();
 	// 禁用角色根据移动方向自动旋转
 	Character->GetCharacterMovement()->bOrientRotationToMovement = false;
 	// 启用角色根据控制器的 Yaw 旋转
