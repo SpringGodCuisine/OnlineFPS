@@ -19,6 +19,7 @@
 #include "Sound/SoundCue.h"
 #include "particles/ParticleSystemComponent.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
+#include "Blaster/Weapon/WeaponTypes.h"
 
 
 ABlasterCharacter::ABlasterCharacter()
@@ -224,6 +225,12 @@ FVector ABlasterCharacter::GetHitTarget() const
 	return Combat->HitTarget;
 }
 
+ECombatState ABlasterCharacter::GetComnbatState() const
+{
+	if (Combat == nullptr)return ECombatState::ECS_MAX;
+	return Combat->CombatState;
+}
+
 void ABlasterCharacter::OnRep_ReplicatedMovement()
 {
 	Super::OnRep_ReplicatedMovement();
@@ -345,7 +352,7 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("Aim", IE_Released, this, &ABlasterCharacter::AimButtonReleased);
 	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &ABlasterCharacter::FireButtonPressed);
 	PlayerInputComponent->BindAction("Fire", IE_Released, this, &ABlasterCharacter::FireButtonReleased);
-
+	PlayerInputComponent->BindAction("Reload", IE_Pressed, this, &ABlasterCharacter::ReloadButtonPressed);
 }
 
 void ABlasterCharacter::PostInitializeComponents()
@@ -367,6 +374,26 @@ void ABlasterCharacter::PlayFireMontage(bool bAiming)
 		AnimInstance->Montage_Play(FireWeaponMontage);
 		FName SectionName;
 		SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
+		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+
+void ABlasterCharacter::PlayReloadMontage()
+{
+	if (Combat == nullptr || Combat->EquippedWeapon == nullptr)return;
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && ReloadMontage)
+	{
+		AnimInstance->Montage_Play(ReloadMontage);
+		FName SectionName;
+
+		switch (Combat->EquippedWeapon->GetWeaponType())
+		{
+			case EWeaponType::EWT_AssaultRifle:
+				SectionName = FName("Rifle");
+				break;
+		}
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
@@ -479,6 +506,14 @@ void ABlasterCharacter::CrouchButtonPressed()
 	else
 	{
 		Crouch();
+	}
+}
+
+void ABlasterCharacter::ReloadButtonPressed()
+{
+	if (Combat)
+	{
+		Combat->Reload();
 	}
 }
 
