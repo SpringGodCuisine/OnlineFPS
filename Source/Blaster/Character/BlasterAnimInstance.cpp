@@ -109,5 +109,7 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 		//DrawDebugLine(GetWorld(), MuzzleTipTransform.GetLocation(), BlasterCharacter->GetHitTarget(), FColor::Orange);
 
 		bUseFABRIK = BlasterCharacter->GetComnbatState() != ECombatState::ECS_Reloading;
+		bUseAimOffsets = BlasterCharacter->GetComnbatState() != ECombatState::ECS_Reloading;
+		bTransformRightHand = BlasterCharacter->GetComnbatState() != ECombatState::ECS_Reloading;
 	}
 }

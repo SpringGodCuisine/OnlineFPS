@@ -170,11 +170,6 @@ void AWeapon::SetWeaponState(EWeaponState State)
 	}
 }
 
-bool AWeapon::IsEmpty()
-{
-	return Ammo <= 0;
-}
-
 void AWeapon::ShowPickupWidget(bool bShowWidget)
 {
 	if (PickupWidget)
@@ -221,3 +216,12 @@ void AWeapon::Dropped()
 	BlasterOwnerController = nullptr;
 }
 
+void AWeapon::AddAmmo(int32 AmmoToAdd)
+{
+	Ammo = FMath::Clamp(Ammo - AmmoToAdd, 0, MagCapacity);
+}
+
+bool AWeapon::IsEmpty()
+{
+	return Ammo <= 0;
+}
