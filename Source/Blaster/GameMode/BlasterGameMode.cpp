@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
+#include "Blaster/Character/BlasterCharacter.h"
 
 ABlasterGameMode::ABlasterGameMode()
 {
@@ -18,7 +19,21 @@ void ABlasterGameMode::BeginPlay()
 	Super::BeginPlay();
 
 	LevelStartingTime = GetWorld()->GetTimeSeconds();
+}
 
+// 游戏模式中比赛状态发生变化， 它将循环遍历服务器上的所有玩家控制器，并调用每个控制器的 OnMatchStateSet 函数。
+void ABlasterGameMode::OnMatchStateSet()
+{
+	Super::OnMatchStateSet();
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		ABlasterPlayerController* BlasterPlayer = Cast<ABlasterPlayerController>(*It);
+		if (BlasterPlayer)
+		{
+			BlasterPlayer->OnMatchStateSet(MatchState);
+		}
+	}
 }
 
 
