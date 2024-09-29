@@ -26,9 +26,32 @@ public:
 	// OnPossess 函数的调用顺序在 Pawn 的 BeginPlay 函数之后。也就是说，当一个 Pawn 被玩家控制器占有时，BeginPlay 会先于 OnPossess 触发。
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void Tick(float DeltaTime) override;
+
+	virtual float GetServerTime(); // Synced with server world clock
+	virtual void ReceivedPlayer() override; // Sync with server clock as soon as possible
 protected:
 	virtual void BeginPlay() override;
 	void SetHUDTime();
+
+	/**
+	* Sync time between client and server
+	*/
+	
+	// Requests the current server time, passing in the client's time when the request was sent
+	UFUNCTION(Server, Reliable)
+	void ServerRequestServerTime(float TimeOfClientRequest);
+
+	// Reports the current server time to the client in response to ServerRequestServerTime
+	UFUNCTION(Client, Reliable)
+	void ClientReportServerTime(float TimeOfClientRequest, float TimeServerReceivedClientRequset);
+
+	float ClientServerDelta = 0.f; // difference between client and server time;
+
+	UPROPERTY(EditAnywhere, Category = Time)
+	float TimeSyncFrequency = 5.f; // how often to sync time with server
+
+	float TimeSyncRunningTime = 0.f; // how long we've been running the time sync
+	void CheckTimeSync(float DeltaTime);
 
 private:
 	UPROPERTY()
