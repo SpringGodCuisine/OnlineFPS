@@ -21,6 +21,7 @@ public:
 	void SetHUDWeaponAmmo(int32 Ammo);
 	void SetHUDCarriedAmmo(int32 Ammo);
 	void SetHUDMatchCountdown(float CountdownTime);
+	void SetHUDAnnouncementCountdown(float CountdownTime);
 
 	// OnPossess 是 Unreal Engine 中的一个虚函数，当控制器占有（Possess）一个 Pawn（游戏角色）时会被调用。父类的 OnPossess 可能处理一些基础逻辑，比如将控制器与角色关联起来。
 	// OnPossess 函数的调用顺序在 Pawn 的 BeginPlay 函数之后。也就是说，当一个 Pawn 被玩家控制器占有时，BeginPlay 会先于 OnPossess 触发。
@@ -58,11 +59,19 @@ protected:
 	float TimeSyncRunningTime = 0.f; // how long we've been running the time sync
 	void CheckTimeSync(float DeltaTime);
 
+	UFUNCTION(Server, Reliable)
+	void ServerCheckMatchState();
+
+	UFUNCTION(Client, Reliable) 
+	void ClientJoinMidgame(FName StateOfMatch, float Warmup, float Match, float StartingTime);
+
 private:
 	UPROPERTY()
 	class ABlasterHUD* BlasterHUD;
 
-	float MatchTime = 120.f;
+	float LevelStartingTime = 0.f;
+	float MatchTime = 0.f;
+	float WarmupTime = 0.f;
 	uint32 CountdownInt;
 
 	UPROPERTY(ReplicatedUsing = OnRep_MatchState)
