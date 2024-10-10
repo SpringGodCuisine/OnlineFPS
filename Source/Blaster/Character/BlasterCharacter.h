@@ -29,10 +29,13 @@ public:
 	void Elim(); 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastElim();
+	virtual void Destroyed() override;
+
+	UPROPERTY(Replicated)
+	bool bDisableGameplay = false;
 
 protected:
 	virtual void BeginPlay() override;
-	virtual void Destroyed() override; 
 
 	void MoveForward(float Value);
 	void MoveRight(float Value);
@@ -56,6 +59,7 @@ protected:
 	void UpdateHUDHealth();
 	// Poll for any relelvant classes and initialize our HUD
 	void PollInit();
+	void RotateInPlace(float DeltaTime);
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = Camera)
@@ -194,5 +198,6 @@ public:
 	FORCEINLINE float GetHealth() const { return Health; }
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
 	ECombatState GetComnbatState() const;
-	 
+	FORCEINLINE UCombatComponent* GetCombat() const { return Combat; }
+	FORCEINLINE bool GetDisableGameplay()const { return bDisableGameplay; }
 };

@@ -11,6 +11,7 @@
 #include "Blaster/GameMode/BlasterGameMode.h"
 #include "Blaster/HUD/Announcement.h"
 #include "Kismet/GameplayStatics.h"
+#include "Blaster/BlasterComponents/CombatComponent.h"
 
 void ABlasterPlayerController::BeginPlay()
 {
@@ -118,6 +119,12 @@ void ABlasterPlayerController::SetHUDMatchCountdown(float CountdownTime)
 		BlasterHUD->CharacterOverlay->MatchCountdownText;
 	if (bHUDVaild)
 	{
+		if (CountdownTime < 0.f)
+		{
+			BlasterHUD->CharacterOverlay->MatchCountdownText->SetText(FText());
+			return;
+		}
+
 		int Minutes = FMath::FloorToInt(CountdownTime / 60.0f);
 		int Seconds = CountdownTime - Minutes * 60;
 
@@ -212,7 +219,7 @@ void ABlasterPlayerController::ClientJoinMidgame_Implementation(FName StateOfMat
 	if (BlasterHUD && MatchState == MatchState::WaitingToStart)
 	{
 		BlasterHUD->AddAnnouncement();
-	}
+	}  
 }
 
 float ABlasterPlayerController::GetServerTime()
@@ -224,8 +231,11 @@ float ABlasterPlayerController::GetServerTime()
 void ABlasterPlayerController::ReceivedPlayer()
 {
 	Super::ReceivedPlayer();
+	// 检查当前 PlayerController 是否是本地客户端控制器
 	if (IsLocalController())
 	{
+		// 如果是本地客户端控制器，向服务器发送请求，获取服务器的时间
+		// GetWorld()->GetTimeSeconds() 返回当前客户端的世界时间秒数
 		ServerRequestServerTime(GetWorld()->GetTimeSeconds());
 	}
 }
@@ -243,10 +253,14 @@ void ABlasterPlayerController::SetHUDTime()
 	}
 	else if (MatchState == MatchState::Cooldown)
 	{
-		TimeLeft = WarmupTime + MatchTime - GetServerTime() + LevelStartingTime;
+		TimeLeft = CooldownTime + WarmupTime + MatchTime - GetServerTime() + LevelStartingTime;
 	}
 
 	uint32 SecondsLeft = FMath::CeilToInt(TimeLeft);
+	/*
+	*服务器：如果当前 PlayerController 实例是在服务器上，HasAuthority() 将返回 true。这意味着该 PlayerController 是在服务器端创建并控制的。
+	*客户端：如果当前 PlayerController 实例是在客户端上，HasAuthority() 将返回 false，因为客户端不具备控制权，控制权在服务器端。
+	*/
 	if (HasAuthority())
 	{
 		BlasterGameMode = BlasterGameMode == nullptr ? Cast<ABlasterGameMode>(UGameplayStatics::GetGameMode(this)) : BlasterGameMode;
@@ -356,5 +370,11 @@ void ABlasterPlayerController::HandleCooldown()
 			BlasterHUD->Announcement->AnnouncementText->SetText(FText::FromString(AnnoucementText));
 			BlasterHUD->Announcement->InfoText->SetText(FText());
 		}
+	}
+	ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(GetPawn());
+	if (BlasterCharacter && BlasterCharacter->GetCombat())
+	{
+		BlasterCharacter->bDisableGameplay = true;
+		BlasterCharacter->GetCombat()->FireButtonPressed(false);
 	}
 }

@@ -42,6 +42,7 @@ protected:
 	virtual void OnMatchStateSet() override;
 
 private:
+	// 下一局开始时间
 	float CountdownTime = 0.f;
 
 public:
