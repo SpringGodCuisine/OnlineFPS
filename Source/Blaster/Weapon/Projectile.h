@@ -33,15 +33,15 @@ protected:
 	UPROPERTY(EditAnywhere)
 	class UBoxComponent* CollisionBox;
 
+	//ProjectileMovementComponent 是专门为投射物设计的组件，通常用于子弹、火箭等物体的移动和轨迹计算
+	UPROPERTY(VisibleAnywhere)
+	class UProjectileMovementComponent* ProjectileMovementComponent;
+
 public:	
 	virtual void Tick(float DeltaTime) override;
 	virtual void Destroyed() override;
 
 private:
-
-	//ProjectileMovementComponent 是专门为投射物设计的组件，通常用于子弹、火箭等物体的移动和轨迹计算
-	UPROPERTY(VisibleAnywhere)
-	class UProjectileMovementComponent* ProjectileMovementComponent;
 
 	//是粒子系统的定义和配置文件，存储粒子系统的资源和设置。
 	UPROPERTY(EditAnyWhere)
