@@ -17,20 +17,27 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	// 只在服务器上获得OnHit事件
 	UFUNCTION()
 	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 
 	UPROPERTY(EditAnyWhere)
 	float Damage = 20.f;
 
+	UPROPERTY(EditAnyWhere)
+	UParticleSystem* ImpactParticles;
+
+	UPROPERTY(EditAnyWhere)
+	class USoundCue* ImpactSound;
+
+	UPROPERTY(EditAnywhere)
+	class UBoxComponent* CollisionBox;
+
 public:	
 	virtual void Tick(float DeltaTime) override;
 	virtual void Destroyed() override;
 
 private:
-
-	UPROPERTY(EditAnywhere)
-	class UBoxComponent* CollisionBox;
 
 	//ProjectileMovementComponent 是专门为投射物设计的组件，通常用于子弹、火箭等物体的移动和轨迹计算
 	UPROPERTY(VisibleAnywhere)
@@ -42,10 +49,4 @@ private:
 	//是一个组件，用于将粒子系统实例化并显示在场景中，控制粒子系统的播放与停止。
 	UPROPERTY()
 	class UParticleSystemComponent* TracerComponent;
-
-	UPROPERTY(EditAnyWhere)
-	UParticleSystem* ImpactParticles;
-
-	UPROPERTY(EditAnyWhere)
-	class USoundCue* ImpactSound;
 };
