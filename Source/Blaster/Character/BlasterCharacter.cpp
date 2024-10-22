@@ -435,6 +435,7 @@ void ABlasterCharacter::PlayReloadMontage()
 	if (AnimInstance && ReloadMontage)
 	{
 		AnimInstance->Montage_Play(ReloadMontage);
+		
 		FName SectionName;
 
 		switch (Combat->EquippedWeapon->GetWeaponType())
